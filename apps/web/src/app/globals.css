@@ -1,0 +1,12 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Provide a glassmorphism effect used in panels */
+.glass {
+  @apply bg-white/10 backdrop-blur-xs border border-white/20 rounded-lg shadow-glass;
+}
+
+.btn {
+  @apply px-4 py-2 rounded-md font-semibold text-white bg-accent hover:bg-accent/80 transition;
+}
