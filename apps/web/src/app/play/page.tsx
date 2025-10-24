@@ -102,7 +102,7 @@ export default function PlayPage() {
       </div>
       <div className="col-span-4 glass p-4 flex flex-col overflow-hidden">
         <h2 className="text-xl font-semibold mb-2">Terminal</h2>
-        {selected ? <Terminal agentId={selected} /> : <p>Select a machine.</p>}
+        {selected ? <Terminal host={selected} /> : <p>Select a machine.</p>}
       </div>
       <div className="col-span-12 glass p-2 overflow-hidden">
         <h2 className="text-xl font-semibold mb-2">Logs &amp; Metrics</h2>

@@ -7,19 +7,17 @@ interface NodeDatum extends d3.SimulationNodeDatum {
   id: string;
 }
 
-/**
- * NetworkGraph renders a small force‑directed graph using D3.  It runs on
- * the client and animates three nodes representing the lab machines.  The
- * animation is intentionally simple to keep CPU usage low.  When this
- * component mounts it creates an SVG element and cleans up on unmount.
- */
 export default function NetworkGraph() {
   const ref = useRef<SVGSVGElement | null>(null);
 
   useEffect(() => {
+    // ✅ Guard window access
+    if (typeof window === "undefined" || !ref.current) return;
+
     const svg = d3.select(ref.current);
     const width = parseInt(svg.style('width'), 10) || window.innerWidth;
     const height = parseInt(svg.style('height'), 10) || window.innerHeight;
+
     const nodes: NodeDatum[] = [
       { id: 'wincvex-dc' },
       { id: 'wincvex-host-b' },
@@ -34,15 +32,13 @@ export default function NetworkGraph() {
       .forceSimulation<NodeDatum>(nodes)
       .force(
         'link',
-        d3
-          .forceLink<NodeDatum, any>(links)
-          .id((d: any) => d.id)
-          .distance(150),
+        d3.forceLink<NodeDatum, any>(links).id((d: any) => d.id).distance(150),
       )
       .force('charge', d3.forceManyBody().strength(-300))
       .force('center', d3.forceCenter(width / 2, height / 2));
 
     svg.selectAll('*').remove();
+
     const link = svg
       .append('g')
       .attr('stroke', '#888')
@@ -51,6 +47,7 @@ export default function NetworkGraph() {
       .data(links)
       .enter()
       .append('line');
+
     const node = svg
       .append('g')
       .attr('stroke', '#fff')
@@ -62,8 +59,7 @@ export default function NetworkGraph() {
       .attr('r', 18)
       .attr('fill', (_d, i) => ['#00C1D5', '#0F4C81', '#2D9CDB'][i])
       .call(
-        d3
-          .drag<SVGCircleElement, NodeDatum>()
+        d3.drag<SVGCircleElement, NodeDatum>()
           .on('start', (event, d) => {
             if (!event.active) simulation.alphaTarget(0.3).restart();
             d.fx = d.x;

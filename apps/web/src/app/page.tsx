@@ -1,154 +1,143 @@
-"use client";
+// src/app/page.tsx
+'use client';
+export const dynamic = 'force-dynamic';
+export const revalidate = 0; // disable prerendering
 
-import { useState, useEffect } from "react";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { useEffect, useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { motion } from "framer-motion";
-import { Loader2 } from "lucide-react";
+import Terminal from "@/components/Terminal";
+
+type Machine = { id: string; name: string };
+type Vuln = { key: string; title: string; description: string; enabled: boolean; fix: string };
+
+const MACHINES: Machine[] = [
+  { id: "wincvex-dc", name: "WinCVEx DC" },
+  { id: "wincvex-host-b", name: "Host B" },
+  { id: "wincvex-host-c", name: "Host C" },
+];
 
 export default function Dashboard() {
-  const [machines, setMachines] = useState([
-    { id: "wincvex-dc", name: "WinCVEx DC" },
-    { id: "wincvex-host-b", name: "Host B" },
-    { id: "wincvex-host-c", name: "Host C" },
-  ]);
-  const [selected, setSelected] = useState("wincvex-dc");
-  const [vulns, setVulns] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [logs, setLogs] = useState<string[]>([]);
+  const [selected, setSelected] = useState<Machine | null>(MACHINES[0]);
+  const [vulns, setVulns] = useState<Vuln[] | null>(null);
+  const [loadingV, setLoadingV] = useState(false);
+  const [apiBase, setApiBase] = useState<string>("");
+
+  // ✅ Safe window usage only inside effect
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setApiBase(window.location.origin);
+    }
+  }, []);
 
   useEffect(() => {
-    fetchVulns(selected);
-    connectLogs(selected);
-  }, [selected]);
-
-  async function fetchVulns(machine: string) {
-    setLoading(true);
-    try {
-      const res = await fetch(`/api/machines/${machine}/vulns`);
-      if (res.ok) {
-        const data = await res.json();
+    const load = async () => {
+      if (!selected || !apiBase) return;
+      setLoadingV(true);
+      try {
+        const res = await fetch(`${apiBase}/api/machines/${selected.id}/vulns`, { cache: "no-store" });
+        if (!res.ok) throw new Error(String(res.status));
+        const data = (await res.json()) as Vuln[];
         setVulns(data);
-      } else {
+      } catch {
         setVulns([]);
+      } finally {
+        setLoadingV(false);
       }
-    } catch (err) {
-      console.error(err);
-      setVulns([]);
-    } finally {
-      setLoading(false);
-    }
-  }
+    };
+    load();
+  }, [selected, apiBase]);
 
-  async function toggleVuln(vulnId: string) {
-    try {
-      await fetch(`/api/vulns/${vulnId}/toggle`, { method: "POST" });
-      fetchVulns(selected);
-    } catch (e) {
-      console.error("Failed to toggle vuln", e);
-    }
-  }
-
-  function connectLogs(machine: string) {
-    const ws = new WebSocket(`ws://localhost:8000/api/ws/logs?machine=${machine}`);
-    ws.onmessage = (msg) => setLogs((prev) => [...prev.slice(-50), msg.data]);
-    ws.onerror = () => setLogs((prev) => [...prev, "⚠️ Log stream error"]);
-    return () => ws.close();
-  }
+  const toggleVuln = async (v: Vuln) => {
+    if (!selected || !apiBase) return;
+    const url = `${apiBase}/api/machines/${selected.id}/vulns/${v.key}/${v.enabled ? "disable" : "enable"}`;
+    await fetch(url, { method: "POST" }).catch(() => {});
+    const res = await fetch(`${apiBase}/api/machines/${selected.id}/vulns`, { cache: "no-store" }).catch(() => null);
+    const data = (await res?.json().catch(() => null)) as Vuln[] | null;
+    setVulns(data ?? []);
+  };
 
   return (
-    <div className="grid grid-cols-12 gap-4 p-6 bg-gray-950 text-white min-h-screen">
-      {/* Machines */}
-      <Card className="col-span-2 bg-gray-900 border-gray-800">
-        <CardHeader>
-          <CardTitle>Machines</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          {machines.map((m) => (
-            <Button
-              key={m.id}
-              variant={m.id === selected ? "default" : "secondary"}
-              className="w-full"
-              onClick={() => setSelected(m.id)}
-            >
-              {m.name}
-            </Button>
-          ))}
-        </CardContent>
-      </Card>
-
-      {/* Vulnerabilities */}
-      <Card className="col-span-4 bg-gray-900 border-gray-800">
-        <CardHeader>
-          <CardTitle>Vulnerabilities</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {loading ? (
-            <div className="flex justify-center py-8">
-              <Loader2 className="animate-spin" />
-            </div>
-          ) : vulns.length > 0 ? (
-            vulns.map((v) => (
-              <motion.div
-                key={v.id}
-                whileHover={{ scale: 1.02 }}
-                className="flex items-center justify-between bg-gray-800 p-3 rounded-xl"
+    <div className="p-6 space-y-6">
+      <div className="grid grid-cols-12 gap-6">
+        {/* Machines */}
+        <Card className="col-span-3 bg-[#0f131a]">
+          <CardHeader>
+            <CardTitle>Machines</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {MACHINES.map((m) => (
+              <Button
+                key={m.id}
+                variant={selected?.id === m.id ? "default" : "secondary"}
+                className="w-full justify-start"
+                onClick={() => setSelected(m)}
               >
-                <div>
-                  <h4 className="font-semibold">{v.name}</h4>
-                  <p className="text-sm text-gray-400">{v.description}</p>
-                </div>
-                <Button
-                  size="sm"
-                  variant={v.enabled ? "destructive" : "default"}
-                  onClick={() => toggleVuln(v.id)}
-                >
-                  {v.enabled ? "Disable" : "Enable"}
-                </Button>
-              </motion.div>
-            ))
-          ) : (
-            <p className="text-gray-500 text-center">No vulnerabilities found.</p>
-          )}
-        </CardContent>
-      </Card>
+                {m.name}
+              </Button>
+            ))}
+          </CardContent>
+        </Card>
 
-      {/* Terminal */}
-      <Card className="col-span-6 bg-gray-900 border-gray-800">
-        <CardHeader>
-          <CardTitle>Terminal</CardTitle>
-        </CardHeader>
-        <CardContent className="font-mono text-sm bg-black text-green-400 rounded p-2 h-64 overflow-y-auto">
-          {logs.length === 0
-            ? "Waiting for logs..."
-            : logs.map((line, i) => <div key={i}>{line}</div>)}
-        </CardContent>
-      </Card>
+        {/* Vulnerabilities */}
+        <Card className="col-span-5 bg-[#0f131a]">
+          <CardHeader>
+            <CardTitle>Vulnerabilities</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {loadingV ? (
+              <div className="text-sm text-zinc-400">Loading…</div>
+            ) : !vulns || vulns.length === 0 ? (
+              <div className="text-sm text-zinc-400">No vulnerabilities found.</div>
+            ) : (
+              vulns.map((v) => (
+                <div
+                  key={v.key}
+                  className="flex items-start justify-between rounded-md border border-white/10 p-3"
+                >
+                  <div>
+                    <div className="font-medium">{v.title}</div>
+                    <div className="text-sm text-zinc-400">{v.description}</div>
+                    {v.fix && <div className="mt-1 text-xs text-emerald-400">Fix: {v.fix}</div>}
+                  </div>
+                  <Button onClick={() => toggleVuln(v)} variant={v.enabled ? "destructive" : "default"}>
+                    {v.enabled ? "Disable" : "Enable"}
+                  </Button>
+                </div>
+              ))
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Terminal */}
+        <Card className="col-span-4 bg-[#0f131a]">
+          <CardHeader>
+            <CardTitle>Terminal</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Terminal host={selected?.id ?? null} />
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Logs & Metrics */}
-      <Card className="col-span-12 bg-gray-900 border-gray-800 mt-4">
+      <Card className="bg-[#0f131a]">
         <CardHeader>
-          <CardTitle>Logs & Metrics</CardTitle>
+          <CardTitle>Logs &amp; Metrics</CardTitle>
         </CardHeader>
-        <CardContent>
-          {logs.length === 0 ? (
-            <p className="text-gray-500 text-center">No logs available.</p>
-          ) : (
-            <div className="grid grid-cols-3 gap-4">
-              <div className="bg-gray-800 p-4 rounded-xl">
-                <h4 className="font-semibold">CPU Usage</h4>
-                <p className="text-green-400 text-lg">27%</p>
-              </div>
-              <div className="bg-gray-800 p-4 rounded-xl">
-                <h4 className="font-semibold">Memory</h4>
-                <p className="text-green-400 text-lg">2.1 GB / 8 GB</p>
-              </div>
-              <div className="bg-gray-800 p-4 rounded-xl">
-                <h4 className="font-semibold">Network</h4>
-                <p className="text-green-400 text-lg">512 KB/s</p>
-              </div>
-            </div>
-          )}
+        <CardContent className="grid grid-cols-3 gap-4">
+          <div className="rounded-md border border-white/10 p-4">
+            <div className="text-sm text-zinc-400">CPU Usage</div>
+            <div className="text-emerald-400 mt-2 text-lg">—</div>
+          </div>
+          <div className="rounded-md border border-white/10 p-4">
+            <div className="text-sm text-zinc-400">Memory</div>
+            <div className="text-emerald-400 mt-2 text-lg">—</div>
+          </div>
+          <div className="rounded-md border border-white/10 p-4">
+            <div className="text-sm text-zinc-400">Network</div>
+            <div className="text-emerald-400 mt-2 text-lg">—</div>
+          </div>
         </CardContent>
       </Card>
     </div>
