@@ -18,7 +18,6 @@ export default function Terminal({ host, apiBase, height = 280 }: TerminalProps)
   const [lines, setLines] = useState<string[]>([]);
   const [input, setInput] = useState("");
   const [connected, setConnected] = useState(false);
-  const [connecting, setConnecting] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [history, setHistory] = useState<string[]>([]);
   const [histIdx, setHistIdx] = useState<number>(-1);
@@ -45,7 +44,6 @@ export default function Terminal({ host, apiBase, height = 280 }: TerminalProps)
   useEffect(() => {
     const el = viewRef.current;
     if (!el) return;
-    el.scrollTop = el.scrollHeight;
   }, [lines]);
 
   const append = useCallback((msg: string) => {
@@ -67,7 +65,7 @@ export default function Terminal({ host, apiBase, height = 280 }: TerminalProps)
         append(`✅ Connected to ${host}`);
       };
 
-      ws.onmessage = (ev) => {
+      #ws.onmessage = (ev) => {
         try {
           const data: Msg = JSON.parse(ev.data);
           if (data.type === "line") append(data.text);
@@ -102,7 +100,7 @@ export default function Terminal({ host, apiBase, height = 280 }: TerminalProps)
     }
     setLines([]);
     setHistIdx(-1);
-    if (host) connect();
+    if (host) c#onnect();
   }, [host, connect]);
 
   const send = useCallback(
